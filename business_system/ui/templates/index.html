@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>智能业务分析系统</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+/* ============================================================
+   全局样式
+   ============================================================ */
+:root {
+  --blue: #1a73e8;
+  --blue-dark: #1557b0;
+  --green: #34a853;
+  --orange: #fb8c00;
+  --purple: #9c27b0;
+  --red: #ea4335;
+  --bg: #f0f2f5;
+  --sidebar-w: 260px;
+  --header-h: 60px;
+  --chat-input-h: 80px;
+  --radius: 12px;
+  --shadow: 0 2px 12px rgba(0,0,0,0.08);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Microsoft YaHei', 'PingFang SC', Arial, sans-serif;
+  background: var(--bg);
+  color: #333;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ============================================================
+   顶部导航
+   ============================================================ */
+.header {
+  height: var(--header-h);
+  background: linear-gradient(135deg, var(--blue), #0d47a1);
+  color: white;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 16px;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  z-index: 100;
+}
+.header-logo { font-size: 22px; }
+.header-title { font-size: 18px; font-weight: 600; flex: 1; }
+.header-status {
+  font-size: 12px;
+  background: rgba(255,255,255,0.15);
+  padding: 4px 12px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.status-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #4caf50;
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* ============================================================
+   主体布局
+   ============================================================ */
+.main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ============================================================
+   侧边栏
+   ============================================================ */
+.sidebar {
+  width: var(--sidebar-w);
+  background: white;
+  border-right: 1px solid #e8eaed;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow-y: auto;
+}
+.sidebar-section { padding: 16px 12px 8px; }
+.sidebar-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 0 8px;
+  margin-bottom: 6px;
+}
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+  font-size: 14px;
+  color: #555;
+}
+.nav-item:hover { background: #f0f4ff; color: var(--blue); }
+.nav-item.active { background: #e8f0fe; color: var(--blue); font-weight: 600; }
+.nav-icon { font-size: 18px; width: 24px; text-align: center; }
+
+/* 快捷查询按钮 */
+.quick-btns { padding: 8px 12px; display: flex; flex-direction: column; gap: 6px; }
+.quick-btn {
+  background: none;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  text-align: left;
+  font-size: 12px;
+  color: #555;
+  transition: all 0.15s;
+}
+.quick-btn:hover { background: #e8f0fe; border-color: var(--blue); color: var(--blue); }
+
+/* 上传区域 */
+.upload-area {
+  margin: 12px;
+  border: 2px dashed #d0d0d0;
+  border-radius: var(--radius);
+  padding: 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 13px;
+  color: #888;
+}
+.upload-area:hover { border-color: var(--blue); color: var(--blue); background: #f0f4ff; }
+.upload-area.drag-over { border-color: var(--blue); background: #e8f0fe; }
+.upload-icon { font-size: 24px; margin-bottom: 6px; }
+
+/* ============================================================
+   内容区
+   ============================================================ */
+.content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Tab 切换 */
+.tabs {
+  display: flex;
+  background: white;
+  border-bottom: 1px solid #e8eaed;
+  padding: 0 20px;
+  flex-shrink: 0;
+}
+.tab-btn {
+  padding: 14px 20px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 14px;
+  color: #666;
+  border-bottom: 3px solid transparent;
+  transition: all 0.15s;
+}
+.tab-btn.active { color: var(--blue); border-bottom-color: var(--blue); font-weight: 600; }
+.tab-btn:hover { color: var(--blue); }
+
+.tab-panel { display: none; flex: 1; overflow: hidden; }
+.tab-panel.active { display: flex; flex-direction: column; }
+
+/* ============================================================
+   聊天界面
+   ============================================================ */
+.chat-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.message {
+  display: flex;
+  gap: 12px;
+  max-width: 85%;
+}
+.message.user { align-self: flex-end; flex-direction: row-reverse; }
+.message.assistant { align-self: flex-start; }
+
+.msg-avatar {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.message.user .msg-avatar { background: var(--blue); color: white; font-size: 14px; }
+.message.assistant .msg-avatar { background: #e8f0fe; }
+
+.msg-content {
+  background: white;
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  box-shadow: var(--shadow);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.message.user .msg-content { background: var(--blue); color: white; }
+.msg-content pre { background: rgba(0,0,0,0.06); padding: 10px; border-radius: 6px; font-size: 12px; overflow-x: auto; margin: 8px 0; }
+.msg-content strong { font-weight: 700; }
+.msg-time { font-size: 11px; color: #aaa; margin-top: 4px; }
+
+/* 打字指示器 */
+.typing-indicator {
+  display: none;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 16px;
+  background: white;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.typing-indicator.show { display: flex; }
+.typing-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #aaa;
+  animation: typing 1.2s infinite;
+}
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes typing { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+
+/* 聊天输入框 */
+.chat-input-area {
+  padding: 16px 20px;
+  background: white;
+  border-top: 1px solid #e8eaed;
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-shrink: 0;
+}
+.chat-input {
+  flex: 1;
+  border: 1px solid #e0e0e0;
+  border-radius: 24px;
+  padding: 12px 20px;
+  font-size: 14px;
+  outline: none;
+  resize: none;
+  max-height: 120px;
+  font-family: inherit;
+  line-height: 1.5;
+  transition: border-color 0.2s;
+}
+.chat-input:focus { border-color: var(--blue); }
+.send-btn {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  background: var(--blue);
+  border: none;
+  color: white;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+.send-btn:hover { background: var(--blue-dark); }
+.send-btn:disabled { background: #ccc; cursor: not-allowed; }
+
+/* 语音按钮 */
+.voice-btn {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  background: #f0f4ff;
+  border: 1px solid #d0d0d0;
+  color: var(--blue);
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+.voice-btn:hover { background: var(--blue); color: white; }
+.voice-btn.recording { background: var(--red); color: white; animation: pulse 1s infinite; }
+
+/* ============================================================
+   数据看板
+   ============================================================ */
+.dashboard {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.kpi-card {
+  background: white;
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: var(--shadow);
+  border-left: 5px solid;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+.kpi-card:hover { transform: translateY(-2px); }
+.kpi-card.blue { border-color: var(--blue); }
+.kpi-card.green { border-color: var(--green); }
+.kpi-card.orange { border-color: var(--orange); }
+.kpi-card.purple { border-color: var(--purple); }
+.kpi-label { font-size: 12px; color: #888; margin-bottom: 8px; }
+.kpi-value { font-size: 24px; font-weight: bold; }
+.kpi-change { font-size: 12px; margin-top: 4px; }
+.kpi-change.up { color: var(--green); }
+.kpi-change.down { color: var(--red); }
+
+.charts-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.chart-card {
+  background: white;
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: var(--shadow);
+}
+.chart-card h3 { font-size: 15px; color: #555; margin-bottom: 16px; font-weight: 600; }
+
+/* 数据表格 */
+.data-table-card {
+  background: white;
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: var(--shadow);
+  overflow-x: auto;
+}
+.data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.data-table th {
+  background: var(--blue);
+  color: white;
+  padding: 10px 14px;
+  text-align: left;
+  font-weight: 500;
+}
+.data-table td { padding: 10px 14px; border-bottom: 1px solid #f0f0f0; }
+.data-table tr:hover td { background: #f8faff; }
+
+/* ============================================================
+   报表面板
+   ============================================================ */
+.reports-panel {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+.report-controls {
+  background: white;
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: var(--shadow);
+  margin-bottom: 20px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-label { font-size: 12px; color: #666; font-weight: 500; }
+.form-input, .form-select {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.form-input:focus, .form-select:focus { border-color: var(--blue); }
+.btn {
+  padding: 9px 20px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn-primary { background: var(--blue); color: white; }
+.btn-primary:hover { background: var(--blue-dark); }
+.btn-success { background: var(--green); color: white; }
+.btn-success:hover { background: #2d8f47; }
+.btn-outline {
+  background: white;
+  color: var(--blue);
+  border: 1px solid var(--blue);
+}
+.btn-outline:hover { background: #e8f0fe; }
+
+/* 报表列表 */
+.report-list { display: flex; flex-direction: column; gap: 12px; }
+.report-item {
+  background: white;
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  box-shadow: var(--shadow);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.report-icon { font-size: 32px; }
+.report-info { flex: 1; }
+.report-title { font-weight: 600; font-size: 14px; }
+.report-meta { font-size: 12px; color: #888; margin-top: 4px; }
+.report-actions { display: flex; gap: 8px; }
+
+/* ============================================================
+   通知/Toast
+   ============================================================ */
+.toast-container {
+  position: fixed;
+  top: 80px;
+  right: 20px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.toast {
+  background: #333;
+  color: white;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  animation: slideIn 0.3s ease;
+}
+.toast.success { background: var(--green); }
+.toast.error { background: var(--red); }
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+/* 加载遮罩 */
+.loading-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.3);
+  z-index: 999;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 16px;
+  color: white;
+  font-size: 14px;
+}
+.loading-overlay.show { display: flex; }
+.spinner {
+  width: 48px; height: 48px;
+  border: 4px solid rgba(255,255,255,0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ============================================================
+   响应式
+   ============================================================ */
+@media (max-width: 900px) {
+  .sidebar { display: none; }
+  .kpi-row { grid-template-columns: repeat(2, 1fr); }
+  .charts-row { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- 顶部导航 -->
+<header class="header">
+  <span class="header-logo">📊</span>
+  <span class="header-title">智能业务分析系统</span>
+  <div class="header-status">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText">连接中...</span>
+  </div>
+</header>
+
+<!-- 主体 -->
+<div class="main">
+
+  <!-- 侧边栏 -->
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">功能导航</div>
+      <div class="nav-item active" onclick="switchTab('chat')">
+        <span class="nav-icon">💬</span> 智能对话
+      </div>
+      <div class="nav-item" onclick="switchTab('dashboard')">
+        <span class="nav-icon">📈</span> 数据看板
+      </div>
+      <div class="nav-item" onclick="switchTab('reports')">
+        <span class="nav-icon">📋</span> 报表中心
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">快捷分析</div>
+      <div class="quick-btns">
+        <button class="quick-btn" onclick="quickQuery('查询本月销售额')">📊 本月销售额</button>
+        <button class="quick-btn" onclick="quickQuery('分析各区域销售情况')">🗺 区域销售分析</button>
+        <button class="quick-btn" onclick="quickQuery('TOP 10 产品销售排名')">📦 产品排名</button>
+        <button class="quick-btn" onclick="quickQuery('客户RFM价值分析')">👥 客户价值分析</button>
+        <button class="quick-btn" onclick="quickQuery('各渠道销售效益对比')">🔀 渠道对比</button>
+        <button class="quick-btn" onclick="quickQuery('生成月度综合报告')">📄 生成月度报告</button>
+        <button class="quick-btn" onclick="quickQuery('销售趋势分析最近6个月')">📉 趋势分析</button>
+        <button class="quick-btn" onclick="quickQuery('KPI完成情况')">🎯 KPI 达成率</button>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">数据接入</div>
+      <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()"
+           ondragover="handleDragOver(event)" ondrop="handleDrop(event)" ondragleave="handleDragLeave(event)">
+        <div class="upload-icon">📂</div>
+        <div>点击或拖拽上传</div>
+        <div style="font-size:11px;margin-top:4px;color:#aaa">Excel / CSV / JSON</div>
+      </div>
+      <input type="file" id="fileInput" style="display:none" accept=".xlsx,.xls,.csv,.json"
+             onchange="uploadFile(this.files[0])">
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">数据来源</div>
+      <div class="nav-item" onclick="showChannelInfo('wechat')">
+        <span class="nav-icon">💚</span> 企业微信
+        <span style="margin-left:auto;font-size:11px;color:#aaa">Webhook</span>
+      </div>
+      <div class="nav-item" onclick="showChannelInfo('dingtalk')">
+        <span class="nav-icon">🔵</span> 钉钉
+        <span style="margin-left:auto;font-size:11px;color:#aaa">Webhook</span>
+      </div>
+      <div class="nav-item" onclick="showChannelInfo('email')">
+        <span class="nav-icon">📧</span> 邮件
+        <span style="margin-left:auto;font-size:11px;color:#aaa">IMAP</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- 内容区 -->
+  <div class="content">
+    <!-- Tab 切换 -->
+    <div class="tabs">
+      <button class="tab-btn active" id="tab-chat" onclick="switchTab('chat')">💬 智能对话</button>
+      <button class="tab-btn" id="tab-dashboard" onclick="switchTab('dashboard')">📈 数据看板</button>
+      <button class="tab-btn" id="tab-reports" onclick="switchTab('reports')">📋 报表中心</button>
+    </div>
+
+    <!-- 聊天面板 -->
+    <div class="tab-panel active" id="panel-chat">
+      <div class="chat-container">
+        <div class="chat-messages" id="chatMessages">
+          <!-- 欢迎消息 -->
+          <div class="message assistant">
+            <div class="msg-avatar">🤖</div>
+            <div>
+              <div class="msg-content">
+                👋 您好！我是您的智能业务分析助手。<br><br>
+                我可以帮您：<br>
+                • 📊 <strong>查询销售数据</strong>（按时间、区域、产品等维度）<br>
+                • 📈 <strong>趋势分析</strong>（月度/季度/年度增长趋势）<br>
+                • 🗺 <strong>区域对比</strong>（各区域销售排名和市场占比）<br>
+                • 👥 <strong>客户分析</strong>（RFM 价值分层）<br>
+                • 📋 <strong>生成报表</strong>（HTML / Excel 格式）<br><br>
+                请上传数据文件后开始分析，或直接提问！
+              </div>
+              <div class="msg-time" id="welcomeTime"></div>
+            </div>
+          </div>
+          <!-- 打字指示器 -->
+          <div class="message assistant" id="typingMsg" style="display:none">
+            <div class="msg-avatar">🤖</div>
+            <div class="typing-indicator show">
+              <div class="typing-dot"></div>
+              <div class="typing-dot"></div>
+              <div class="typing-dot"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="chat-input-area">
+          <button class="voice-btn" id="voiceBtn" onclick="toggleVoice()" title="语音输入">🎤</button>
+          <textarea class="chat-input" id="chatInput" placeholder="输入问题，如：本月各区域销售额对比如何？" rows="1"
+                    onkeydown="handleKeyDown(event)" oninput="autoResize(this)"></textarea>
+          <button class="send-btn" id="sendBtn" onclick="sendMessage()" title="发送">➤</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 数据看板面板 -->
+    <div class="tab-panel" id="panel-dashboard">
+      <div class="dashboard" id="dashboardContent">
+        <!-- KPI -->
+        <div class="kpi-row">
+          <div class="kpi-card blue">
+            <div class="kpi-label">总销售额</div>
+            <div class="kpi-value" id="kpi-revenue">--</div>
+            <div class="kpi-change" id="kpi-revenue-change">暂无数据</div>
+          </div>
+          <div class="kpi-card green">
+            <div class="kpi-label">总利润</div>
+            <div class="kpi-value" id="kpi-profit">--</div>
+            <div class="kpi-change" id="kpi-profit-change">暂无数据</div>
+          </div>
+          <div class="kpi-card orange">
+            <div class="kpi-label">平均利润率</div>
+            <div class="kpi-value" id="kpi-margin">--</div>
+            <div class="kpi-change" id="kpi-margin-change">暂无数据</div>
+          </div>
+          <div class="kpi-card purple">
+            <div class="kpi-label">数据记录数</div>
+            <div class="kpi-value" id="kpi-records">--</div>
+            <div class="kpi-change">总计录入</div>
+          </div>
+        </div>
+
+        <!-- 图表 -->
+        <div class="charts-row">
+          <div class="chart-card">
+            <h3>📈 月度销售趋势</h3>
+            <canvas id="trendChart" height="80"></canvas>
+          </div>
+          <div class="chart-card">
+            <h3>🗺 区域销售占比</h3>
+            <canvas id="regionPieChart"></canvas>
+          </div>
+        </div>
+
+        <div class="charts-row">
+          <div class="chart-card">
+            <h3>📦 产品销售排名 TOP10</h3>
+            <canvas id="productChart" height="100"></canvas>
+          </div>
+          <div class="chart-card">
+            <h3>🔀 渠道分布</h3>
+            <canvas id="channelChart"></canvas>
+          </div>
+        </div>
+
+        <!-- 数据表格 -->
+        <div class="data-table-card" style="margin-top:16px">
+          <h3 style="margin-bottom:12px;font-size:15px;color:#555">📊 区域销售明细</h3>
+          <table class="data-table" id="regionTable">
+            <thead>
+              <tr><th>区域</th><th>销售额</th><th>利润</th><th>占比</th><th>利润率</th><th>订单数</th></tr>
+            </thead>
+            <tbody id="regionTableBody">
+              <tr><td colspan="6" style="text-align:center;color:#aaa;padding:20px">请先上传数据</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 报表面板 -->
+    <div class="tab-panel" id="panel-reports">
+      <div class="reports-panel">
+        <div class="report-controls">
+          <div class="form-group">
+            <label class="form-label">报表标题</label>
+            <input type="text" class="form-input" id="reportTitle" value="业务综合分析报告" style="width:220px">
+          </div>
+          <div class="form-group">
+            <label class="form-label">输出格式</label>
+            <select class="form-select" id="reportFormat">
+              <option value="html">HTML（含图表）</option>
+              <option value="excel">Excel 表格</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">分析维度</label>
+            <select class="form-select" id="reportTypes" multiple style="height:60px">
+              <option value="sales_trend" selected>销售趋势</option>
+              <option value="region" selected>区域分析</option>
+              <option value="product" selected>产品分析</option>
+              <option value="channel">渠道分析</option>
+              <option value="rfm">客户价值</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" onclick="generateReport()">📋 生成报表</button>
+          <button class="btn btn-outline" onclick="loadDashboard()">🔄 刷新看板</button>
+        </div>
+
+        <div class="report-list" id="reportList">
+          <div style="text-align:center;color:#aaa;padding:40px;font-size:14px">
+            暂无报表，点击「生成报表」创建第一份报告
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<!-- Toast 容器 -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- 加载遮罩 -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <span id="loadingText">处理中...</span>
+</div>
+
+<script>
+// ============================================================
+// 状态管理
+// ============================================================
+const API_BASE = '/api';
+let sessionId = null;
+let trendChart = null, regionChart = null, productChart = null, channelChart = null;
+let isRecording = false;
+let mediaRecorder = null;
+let recognition = null;
+
+// 初始化
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('welcomeTime').textContent = formatTime(new Date());
+  checkStatus();
+  setInterval(checkStatus, 30000);
+  initSpeechRecognition();
+});
+
+// ============================================================
+// 系统状态检查
+// ============================================================
+async function checkStatus() {
+  try {
+    const resp = await fetch(`${API_BASE}/status`);
+    const data = await resp.json();
+    const dot = document.getElementById('statusDot');
+    const text = document.getElementById('statusText');
+    if (data.status === 'running') {
+      dot.style.background = '#4caf50';
+      text.textContent = data.data_loaded ? '已就绪 · 有数据' : '已连接 · 待上传数据';
+    } else {
+      dot.style.background = '#f44336';
+      text.textContent = '服务异常';
+    }
+  } catch {
+    document.getElementById('statusDot').style.background = '#f44336';
+    document.getElementById('statusText').textContent = '连接失败';
+  }
+}
+
+// ============================================================
+// Tab 切换
+// ============================================================
+function switchTab(tab) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById(`panel-${tab}`).classList.add('active');
+  document.getElementById(`tab-${tab}`).classList.add('active');
+
+  if (tab === 'dashboard') loadDashboard();
+}
+
+// ============================================================
+// 聊天功能
+// ============================================================
+async function sendMessage() {
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text) return;
+
+  input.value = '';
+  autoResize(input);
+  appendMessage('user', text);
+  showTyping(true);
+  document.getElementById('sendBtn').disabled = true;
+
+  try {
+    const resp = await fetch(`${API_BASE}/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text, session_id: sessionId }),
+    });
+    const data = await resp.json();
+    sessionId = data.session_id;
+    showTyping(false);
+    appendMessage('assistant', data.reply);
+
+    // 如果有数据结果且在看板 tab，刷新看板
+    if (data.data_result && data.data_result.type !== 'general') {
+      setTimeout(loadDashboard, 500);
+    }
+  } catch (err) {
+    showTyping(false);
+    appendMessage('assistant', '❌ 请求失败，请检查服务是否正常运行。');
+  }
+  document.getElementById('sendBtn').disabled = false;
+}
+
+function appendMessage(role, content) {
+  const container = document.getElementById('chatMessages');
+  const typingMsg = document.getElementById('typingMsg');
+
+  const div = document.createElement('div');
+  div.className = `message ${role}`;
+  const formattedContent = formatMarkdown(content);
+  div.innerHTML = `
+    <div class="msg-avatar">${role === 'user' ? '👤' : '🤖'}</div>
+    <div>
+      <div class="msg-content">${formattedContent}</div>
+      <div class="msg-time">${formatTime(new Date())}</div>
+    </div>`;
+  container.insertBefore(div, typingMsg);
+  container.scrollTop = container.scrollHeight;
+}
+
+function formatMarkdown(text) {
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/```([\s\S]*?)```/g, '<pre>$1</pre>')
+    .replace(/\n/g, '<br>');
+}
+
+function showTyping(show) {
+  document.getElementById('typingMsg').style.display = show ? 'flex' : 'none';
+  const container = document.getElementById('chatMessages');
+  container.scrollTop = container.scrollHeight;
+}
+
+function handleKeyDown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+function quickQuery(text) {
+  document.getElementById('chatInput').value = text;
+  switchTab('chat');
+  sendMessage();
+}
+
+// ============================================================
+// 语音输入
+// ============================================================
+function initSpeechRecognition() {
+  if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognition = new SpeechRecognition();
+    recognition.lang = 'zh-CN';
+    recognition.continuous = false;
+    recognition.interimResults = true;
+
+    recognition.onresult = (e) => {
+      const transcript = Array.from(e.results).map(r => r[0].transcript).join('');
+      document.getElementById('chatInput').value = transcript;
+      autoResize(document.getElementById('chatInput'));
+    };
+    recognition.onend = () => {
+      isRecording = false;
+      document.getElementById('voiceBtn').classList.remove('recording');
+    };
+  }
+}
+
+function toggleVoice() {
+  if (!recognition) { showToast('您的浏览器不支持语音识别', 'error'); return; }
+  if (isRecording) {
+    recognition.stop();
+    isRecording = false;
+    document.getElementById('voiceBtn').classList.remove('recording');
+  } else {
+    recognition.start();
+    isRecording = true;
+    document.getElementById('voiceBtn').classList.add('recording');
+    showToast('🎤 正在录音，请说话...', 'success');
+  }
+}
+
+// ============================================================
+// 文件上传
+// ============================================================
+async function uploadFile(file) {
+  if (!file) return;
+  showLoading(`正在上传并处理文件: ${file.name}`);
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    const resp = await fetch(`${API_BASE}/upload`, { method: 'POST', body: formData });
+    const data = await resp.json();
+    hideLoading();
+
+    if (data.success) {
+      showToast(`✅ 文件上传成功，导入 ${data.records_imported} 条记录`, 'success');
+      appendMessage('assistant',
+        `✅ **文件上传成功！**\n\n` +
+        `• 文件名: ${file.name}\n` +
+        `• 导入记录: ${data.records_imported} 条\n` +
+        (data.summary?.date_range ? `• 数据时间范围: ${data.summary.date_range.start} ~ ${data.summary.date_range.end}\n` : '') +
+        `• 总销售额: ¥${(data.summary?.total_amount || 0).toLocaleString()}\n\n` +
+        `数据已就绪，您可以开始查询分析了！`
+      );
+      switchTab('chat');
+      setTimeout(loadDashboard, 1000);
+    } else {
+      showToast('文件处理失败', 'error');
+    }
+  } catch (err) {
+    hideLoading();
+    showToast('上传失败，请重试', 'error');
+  }
+}
+
+function handleDragOver(e) {
+  e.preventDefault();
+  document.getElementById('uploadArea').classList.add('drag-over');
+}
+function handleDragLeave(e) {
+  document.getElementById('uploadArea').classList.remove('drag-over');
+}
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('uploadArea').classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) uploadFile(file);
+}
+
+// ============================================================
+// 数据看板
+// ============================================================
+async function loadDashboard() {
+  try {
+    const resp = await fetch(`${API_BASE}/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ analysis_type: 'summary', params: {} }),
+    });
+    const result = await resp.json();
+    if (result.data) updateDashboard(result.data);
+  } catch (err) {
+    console.warn('看板数据加载失败:', err);
+  }
+}
+
+function updateDashboard(data) {
+  const basic = data.basic || {};
+  // KPI
+  setKPI('kpi-revenue', '¥' + formatNum(basic.total_revenue));
+  setKPI('kpi-profit', '¥' + formatNum(basic.total_profit));
+  setKPI('kpi-margin', ((basic.avg_profit_margin || 0) * 100).toFixed(1) + '%');
+  setKPI('kpi-records', formatNum(basic.total_records, 0));
+
+  // 趋势图
+  const trend = data.monthly_trend || [];
+  renderTrendChart(trend);
+
+  // 区域图
+  const regions = data.top_regions || [];
+  renderRegionChart(regions);
+  renderRegionTable(regions);
+
+  // 产品图
+  const products = data.top_products || [];
+  renderProductChart(products);
+
+  // 渠道图
+  const channels = data.channels || [];
+  renderChannelChart(channels);
+}
+
+function setKPI(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = value;
+}
+
+function renderTrendChart(trend) {
+  const ctx = document.getElementById('trendChart');
+  if (!ctx) return;
+  if (trendChart) trendChart.destroy();
+  trendChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: trend.map(r => r.period_str || ''),
+      datasets: [
+        { label: '销售额', data: trend.map(r => r.total_amount || 0), backgroundColor: '#1a73e899', borderColor: '#1a73e8', borderWidth: 2, yAxisID: 'y' },
+        { label: '利润', data: trend.map(r => r.total_profit || 0), type: 'line', borderColor: '#34a853', backgroundColor: '#34a85322', borderWidth: 2, yAxisID: 'y', tension: 0.4 },
+      ],
+    },
+    options: { responsive: true, plugins: { legend: { position: 'top' } } },
+  });
+}
+
+function renderRegionChart(regions) {
+  const ctx = document.getElementById('regionPieChart');
+  if (!ctx) return;
+  if (regionChart) regionChart.destroy();
+  const colors = ['#1a73e8','#34a853','#fb8c00','#9c27b0','#ea4335','#00bcd4','#8bc34a'];
+  regionChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: regions.map(r => r.region || ''),
+      datasets: [{ data: regions.map(r => r.total_amount || 0), backgroundColor: colors }],
+    },
+    options: { responsive: true, plugins: { legend: { position: 'bottom' } } },
+  });
+}
+
+function renderProductChart(products) {
+  const ctx = document.getElementById('productChart');
+  if (!ctx) return;
+  if (productChart) productChart.destroy();
+  productChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: products.map(p => p.product_name || p.category || ''),
+      datasets: [{ label: '销售额', data: products.map(p => p.total_amount || 0), backgroundColor: '#fb8c00cc' }],
+    },
+    options: { indexAxis: 'y', responsive: true },
+  });
+}
+
+function renderChannelChart(channels) {
+  const ctx = document.getElementById('channelChart');
+  if (!ctx) return;
+  if (channelChart) channelChart.destroy();
+  const colors = ['#1a73e8','#34a853','#fb8c00','#9c27b0','#ea4335'];
+  channelChart = new Chart(ctx, {
+    type: 'pie',
+    data: {
+      labels: channels.map(c => c.sales_channel || ''),
+      datasets: [{ data: channels.map(c => c.total_amount || 0), backgroundColor: colors }],
+    },
+    options: { responsive: true, plugins: { legend: { position: 'bottom' } } },
+  });
+}
+
+function renderRegionTable(regions) {
+  const tbody = document.getElementById('regionTableBody');
+  if (!tbody) return;
+  if (!regions.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#aaa;padding:20px">暂无数据，请先上传</td></tr>';
+    return;
+  }
+  tbody.innerHTML = regions.map(r => `
+    <tr>
+      <td>${r.region || ''}</td>
+      <td>¥${formatNum(r.total_amount)}</td>
+      <td>¥${formatNum(r.total_profit)}</td>
+      <td>${(r.revenue_share || 0).toFixed(1)}%</td>
+      <td>${((r.avg_profit_margin || 0)*100).toFixed(1)}%</td>
+      <td>${r.order_count || 0}</td>
+    </tr>`).join('');
+}
+
+// ============================================================
+// 报表生成
+// ============================================================
+async function generateReport() {
+  const title = document.getElementById('reportTitle').value;
+  const format = document.getElementById('reportFormat').value;
+  const typesEl = document.getElementById('reportTypes');
+  const types = Array.from(typesEl.selectedOptions).map(o => o.value);
+
+  showLoading('正在生成报表...');
+  try {
+    const resp = await fetch(`${API_BASE}/report`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, report_format: format, analysis_types: types }),
+    });
+    const data = await resp.json();
+    hideLoading();
+
+    if (data.success) {
+      showToast('✅ 报表生成成功！', 'success');
+      addReportToList(data);
+      if (format === 'html') {
+        window.open(data.download_url.replace('download', 'view'), '_blank');
+      }
+    } else {
+      showToast('报表生成失败', 'error');
+    }
+  } catch (err) {
+    hideLoading();
+    showToast('生成失败，请先上传数据', 'error');
+  }
+}
+
+function addReportToList(data) {
+  const list = document.getElementById('reportList');
+  const existing = list.querySelector('[data-empty]');
+  if (existing) existing.remove();
+
+  const item = document.createElement('div');
+  item.className = 'report-item';
+  item.innerHTML = `
+    <div class="report-icon">${data.format === 'html' ? '📊' : '📗'}</div>
+    <div class="report-info">
+      <div class="report-title">${data.format === 'html' ? 'HTML 报表' : 'Excel 报表'}</div>
+      <div class="report-meta">生成时间: ${new Date().toLocaleString('zh-CN')}</div>
+    </div>
+    <div class="report-actions">
+      ${data.format === 'html'
+        ? `<button class="btn btn-outline" onclick="window.open('${data.download_url.replace('download','view')}','_blank')">👁 预览</button>`
+        : ''}
+      <a href="${data.download_url}" download><button class="btn btn-primary">⬇ 下载</button></a>
+    </div>`;
+  list.prepend(item);
+}
+
+// ============================================================
+// 渠道信息展示
+// ============================================================
+function showChannelInfo(channel) {
+  const info = {
+    wechat: '企业微信 Webhook 地址：\n/api/webhook/wechat\n\n在企业微信后台配置应用的「接收消息」URL',
+    dingtalk: '钉钉机器人 Webhook 地址：\n/api/webhook/dingtalk\n\n在钉钉群中添加自定义机器人，URL 设置为本地址',
+    email: '邮件接入方式：\n• IMAP 轮询（后台定时检查）\n• SendGrid Inbound Parse → /api/webhook/email',
+  };
+  appendMessage('assistant', `📡 **${channel === 'wechat' ? '企业微信' : channel === 'dingtalk' ? '钉钉' : '邮件'} 接入说明**\n\n` + info[channel]);
+  switchTab('chat');
+}
+
+// ============================================================
+// 工具函数
+// ============================================================
+function formatNum(n, decimals = 0) {
+  if (n == null || isNaN(n)) return '--';
+  return Number(n).toLocaleString('zh-CN', { maximumFractionDigits: decimals });
+}
+
+function formatTime(d) {
+  return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+}
+
+function showToast(msg, type = '') {
+  const container = document.getElementById('toastContainer');
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  container.appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+function showLoading(text = '处理中...') {
+  document.getElementById('loadingText').textContent = text;
+  document.getElementById('loadingOverlay').classList.add('show');
+}
+
+function hideLoading() {
+  document.getElementById('loadingOverlay').classList.remove('show');
+}
+</script>
+</body>
+</html>
