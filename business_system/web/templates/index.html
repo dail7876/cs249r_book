@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ app_name }}</title>
+<link rel="stylesheet" href="/static/css/main.css">
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+<!-- ═══════════════════════ 顶部导航 ═══════════════════════ -->
+<header class="header">
+  <div class="header-left">
+    <div class="logo">📊</div>
+    <span class="app-title">{{ app_name }}</span>
+  </div>
+  <nav class="nav-tabs">
+    <button class="nav-btn active" data-tab="dashboard">数据看板</button>
+    <button class="nav-btn" data-tab="analysis">市场分析</button>
+    <button class="nav-btn" data-tab="reports">报表中心</button>
+    <button class="nav-btn" data-tab="chat">智能对话</button>
+    <button class="nav-btn" data-tab="settings">系统设置</button>
+  </nav>
+  <div class="header-right">
+    <div class="data-status" id="dataStatus">
+      <span class="dot dot-gray"></span>
+      <span id="dataStatusText">未上传数据</span>
+    </div>
+  </div>
+</header>
+
+<main class="main-layout">
+
+<!-- ═══════════════════════ 侧边栏 ═══════════════════════ -->
+<aside class="sidebar">
+  <!-- 上传区域 -->
+  <div class="sidebar-section">
+    <h3 class="sidebar-title">📁 数据接入</h3>
+    <div class="upload-zone" id="uploadZone">
+      <div class="upload-icon">⬆️</div>
+      <p>拖拽文件或点击上传</p>
+      <p class="upload-hint">支持 Excel / CSV</p>
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.xlsm,.csv" style="display:none">
+    </div>
+    <div class="upload-sources">
+      <p class="source-label">其他接入方式：</p>
+      <div class="source-badges">
+        <span class="badge badge-green" title="微信企业号 Webhook 已配置">💬 微信</span>
+        <span class="badge badge-blue" title="钉钉 Webhook 已配置">🔔 钉钉</span>
+        <span class="badge badge-orange" title="邮件 IMAP 轮询">📧 邮件</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 快速查询 -->
+  <div class="sidebar-section">
+    <h3 class="sidebar-title">⚡ 快速查询</h3>
+    <div class="quick-btns">
+      <button class="quick-btn" onclick="loadKPI()">总体KPI</button>
+      <button class="quick-btn" onclick="loadTrend()">月度趋势</button>
+      <button class="quick-btn" onclick="loadProducts()">产品排行</button>
+      <button class="quick-btn" onclick="loadRegions()">区域分析</button>
+      <button class="quick-btn" onclick="loadChannels()">渠道分析</button>
+      <button class="quick-btn" onclick="loadRFM()">客户RFM</button>
+      <button class="quick-btn" onclick="loadForecast()">销售预测</button>
+      <button class="quick-btn" onclick="loadYoyMom()">同比环比</button>
+    </div>
+  </div>
+
+  <!-- 日期筛选 -->
+  <div class="sidebar-section">
+    <h3 class="sidebar-title">📅 日期范围</h3>
+    <input type="date" id="dateFrom" class="date-input" placeholder="开始日期">
+    <input type="date" id="dateTo" class="date-input" placeholder="结束日期">
+    <button class="btn-primary btn-sm" onclick="applyFilter()">应用筛选</button>
+    <button class="btn-ghost btn-sm" onclick="clearFilter()">清除</button>
+  </div>
+</aside>
+
+<!-- ═══════════════════════ 主内容区 ═══════════════════════ -->
+<div class="content">
+
+  <!-- ▸ 数据看板 Tab -->
+  <div class="tab-panel active" id="tab-dashboard">
+    <!-- KPI 卡片行 -->
+    <div class="kpi-row" id="kpiRow">
+      <div class="kpi-card skeleton"></div>
+      <div class="kpi-card skeleton"></div>
+      <div class="kpi-card skeleton"></div>
+      <div class="kpi-card skeleton"></div>
+    </div>
+
+    <!-- 图表网格 -->
+    <div class="chart-grid">
+      <div class="chart-card span-2">
+        <div class="chart-header">
+          <h3>📈 月度销售趋势</h3>
+          <div class="chart-controls">
+            <select id="trendFreq" onchange="loadTrend()">
+              <option value="D">日</option>
+              <option value="W">周</option>
+              <option value="ME" selected>月</option>
+              <option value="QE">季</option>
+              <option value="YE">年</option>
+            </select>
+          </div>
+        </div>
+        <div id="chartTrend" class="chart-body"></div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-header"><h3>🛍️ 产品销售 TOP 10</h3></div>
+        <div id="chartProducts" class="chart-body"></div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-header"><h3>🗺️ 区域销售占比</h3></div>
+        <div id="chartRegions" class="chart-body"></div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-header"><h3>📣 销售渠道分析</h3></div>
+        <div id="chartChannels" class="chart-body"></div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-header"><h3>🔮 销售预测</h3></div>
+        <div id="chartForecast" class="chart-body"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ▸ 市场分析 Tab -->
+  <div class="tab-panel" id="tab-analysis">
+    <div class="analysis-toolbar">
+      <h2>市场分析中心</h2>
+      <div class="toolbar-actions">
+        <button class="btn-primary" onclick="runFullAnalysis()">🔄 全量分析</button>
+      </div>
+    </div>
+
+    <!-- 同比环比卡片 -->
+    <div id="yoySection" class="analysis-section">
+      <h3>📊 同比 / 环比</h3>
+      <div id="yoyContent" class="yoy-grid"></div>
+    </div>
+
+    <!-- 产品 ABC 分析 -->
+    <div class="analysis-section">
+      <h3>🏷️ 产品 ABC 分析</h3>
+      <div id="abcContent" class="abc-grid"></div>
+      <div id="chartABC" style="height:350px;"></div>
+    </div>
+
+    <!-- 异常检测 -->
+    <div class="analysis-section">
+      <h3>⚠️ 异常数据检测</h3>
+      <div id="anomalyContent" class="anomaly-table"></div>
+    </div>
+
+    <!-- 客户 RFM -->
+    <div class="analysis-section">
+      <h3>👥 客户 RFM 分析</h3>
+      <div id="rfmContent" class="rfm-table"></div>
+    </div>
+  </div>
+
+  <!-- ▸ 报表中心 Tab -->
+  <div class="tab-panel" id="tab-reports">
+    <div class="reports-header">
+      <h2>报表中心</h2>
+    </div>
+    <div class="report-actions-grid">
+      <div class="report-action-card">
+        <div class="report-icon">📊</div>
+        <h3>Excel 多维报表</h3>
+        <p>包含KPI、趋势、产品、区域、渠道、RFM等多个Sheet</p>
+        <button class="btn-primary" onclick="generateReport('excel')">生成 Excel 报表</button>
+      </div>
+      <div class="report-action-card">
+        <div class="report-icon">🌐</div>
+        <h3>HTML 可视化报表</h3>
+        <p>交互式图表报告，可直接在浏览器查看</p>
+        <button class="btn-primary" onclick="generateReport('html')">生成 HTML 报表</button>
+      </div>
+      <div class="report-action-card">
+        <div class="report-icon">📱</div>
+        <h3>推送摘要报告</h3>
+        <p>将数据摘要推送到微信/钉钉</p>
+        <button class="btn-secondary" onclick="pushSummary()">推送到企业群</button>
+      </div>
+    </div>
+
+    <div class="report-title-section">
+      <label>报表标题</label>
+      <input type="text" id="reportTitle" class="form-input" value="营销数据分析报告" placeholder="输入报表标题">
+    </div>
+
+    <!-- 已生成报表列表 -->
+    <h3 class="section-title">📋 历史报表</h3>
+    <div id="reportList" class="report-list"></div>
+  </div>
+
+  <!-- ▸ 智能对话 Tab -->
+  <div class="tab-panel" id="tab-chat">
+    <div class="chat-layout">
+      <div class="chat-info">
+        <h2>💬 智能营销助手</h2>
+        <p class="chat-desc">用自然语言查询数据、获取分析报告、生成图表</p>
+        <div class="chat-examples">
+          <p>💡 试试这些问题：</p>
+          <button class="example-btn" onclick="sendExample('本月销售额是多少？')">本月销售额是多少？</button>
+          <button class="example-btn" onclick="sendExample('哪个产品卖得最好？')">哪个产品卖得最好？</button>
+          <button class="example-btn" onclick="sendExample('各区域销售占比如何？')">各区域销售占比如何？</button>
+          <button class="example-btn" onclick="sendExample('生成一份HTML分析报告')">生成一份HTML分析报告</button>
+          <button class="example-btn" onclick="sendExample('客户RFM分类结果是什么？')">客户RFM分类结果</button>
+          <button class="example-btn" onclick="sendExample('销售趋势如何，未来3个月预测')">未来销售趋势预测</button>
+        </div>
+      </div>
+
+      <div class="chat-box">
+        <div class="chat-messages" id="chatMessages">
+          <div class="chat-msg assistant">
+            <div class="msg-avatar">🤖</div>
+            <div class="msg-bubble">
+              您好！我是智能营销数据分析助手。<br>
+              请上传您的营销数据文件，然后用自然语言向我提问。<br><br>
+              输入 <code>帮助</code> 查看所有功能。
+            </div>
+          </div>
+        </div>
+        <div class="typing-indicator" id="typingIndicator" style="display:none">
+          <span></span><span></span><span></span>
+        </div>
+        <div class="chat-input-row">
+          <textarea id="chatInput" class="chat-input" placeholder="输入您的问题..." rows="2"
+                    onkeydown="handleChatKey(event)"></textarea>
+          <button class="send-btn" onclick="sendChatMessage()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ▸ 系统设置 Tab -->
+  <div class="tab-panel" id="tab-settings">
+    <h2>系统设置</h2>
+    <div class="settings-grid">
+      <div class="settings-card">
+        <h3>🤖 AI 配置</h3>
+        <div class="form-group">
+          <label>AI 服务商</label>
+          <select class="form-input" id="aiProvider">
+            <option value="openai">OpenAI (GPT)</option>
+            <option value="anthropic">Anthropic (Claude)</option>
+            <option value="none">规则引擎（无需API）</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>API Key</label>
+          <input type="password" class="form-input" id="apiKey" placeholder="sk-...">
+        </div>
+      </div>
+
+      <div class="settings-card">
+        <h3>💬 微信配置</h3>
+        <div class="form-group">
+          <label>Webhook 地址</label>
+          <input type="text" class="form-input" placeholder="企业微信群机器人 Webhook URL">
+        </div>
+        <div class="info-text">
+          微信企业号接收 Webhook：<br>
+          <code id="wechatWebhook"></code>
+        </div>
+      </div>
+
+      <div class="settings-card">
+        <h3>🔔 钉钉配置</h3>
+        <div class="form-group">
+          <label>机器人 Webhook</label>
+          <input type="text" class="form-input" placeholder="钉钉自定义机器人 Webhook">
+        </div>
+        <div class="info-text">
+          钉钉接收 Webhook：<br>
+          <code id="dingtalkWebhook"></code>
+        </div>
+      </div>
+
+      <div class="settings-card">
+        <h3>📧 邮件配置</h3>
+        <div class="form-group">
+          <label>IMAP 服务器</label>
+          <input type="text" class="form-input" placeholder="imap.example.com">
+        </div>
+        <div class="form-group">
+          <label>邮箱账号</label>
+          <input type="email" class="form-input" placeholder="your@email.com">
+        </div>
+        <div class="form-group">
+          <label>邮箱密码 / 授权码</label>
+          <input type="password" class="form-input" placeholder="密码或授权码">
+        </div>
+        <div class="form-group">
+          <label>检查间隔（秒）</label>
+          <input type="number" class="form-input" value="300">
+        </div>
+      </div>
+
+      <div class="settings-card">
+        <h3>🏢 公司信息</h3>
+        <div class="form-group">
+          <label>公司名称</label>
+          <input type="text" class="form-input" placeholder="公司名称（用于报表抬头）">
+        </div>
+      </div>
+    </div>
+    <button class="btn-primary" onclick="saveSettings()">💾 保存配置</button>
+  </div>
+
+</div><!-- /content -->
+</main>
+
+<!-- ═══════════════════════ 上传进度浮层 ═══════════════════════ -->
+<div id="uploadOverlay" class="overlay" style="display:none">
+  <div class="overlay-box">
+    <div class="spinner"></div>
+    <p id="uploadStatus">正在处理数据...</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════ Toast 通知 ═══════════════════════ -->
+<div id="toastContainer"></div>
+
+<script src="/static/js/main.js"></script>
+</body>
+</html>
